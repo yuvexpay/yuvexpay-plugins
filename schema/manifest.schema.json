@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/yuvexpay/yuvexpay-plugins/schema/manifest.schema.json",
+  "title": "YuvexPay plugin manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "version",
+    "developer",
+    "configSchema",
+    "events",
+    "scopes",
+    "egress",
+    "actions"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+      "description": "Lowercase kebab-case identifier. Must match the manifest filename."
+    },
+    "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "MAJOR.MINOR.PATCH"
+    },
+    "developer": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "description": { "type": "string", "maxLength": 500 },
+    "icon": { "type": "string", "maxLength": 500 },
+    "configSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "object" },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type"],
+            "properties": {
+              "type": { "enum": ["string", "number", "boolean"] },
+              "title": { "type": "string", "maxLength": 120 },
+              "description": { "type": "string", "maxLength": 500 },
+              "secret": { "type": "boolean" },
+              "default": { "type": ["string", "number", "boolean"] }
+            }
+          }
+        },
+        "required": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "enum": [
+          "payment.created",
+          "payment.paid",
+          "payment.refunded",
+          "withdrawal.paid",
+          "med.opened"
+        ]
+      }
+    },
+    "scopes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "enum": ["data", "tracking", "customer.contact", "customer.document"]
+      },
+      "contains": { "const": "data" }
+    },
+    "egress": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 253,
+        "pattern": "^[a-z0-9][a-z0-9.-]*\\.[a-z]{2,}$",
+        "description": "Bare lowercase fully-qualified host. No scheme, no port, no path."
+      }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["on", "request"],
+        "properties": {
+          "on": {
+            "enum": [
+              "payment.created",
+              "payment.paid",
+              "payment.refunded",
+              "withdrawal.paid",
+              "med.opened"
+            ]
+          },
+          "request": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["method", "url"],
+            "properties": {
+              "method": { "enum": ["POST", "PUT", "PATCH"] },
+              "url": { "type": "string", "pattern": "^https://" },
+              "headers": {
+                "type": "object",
+                "additionalProperties": { "type": "string" }
+              },
+              "body": {}
+            }
+          }
+        }
+      }
+    }
+  }
+}

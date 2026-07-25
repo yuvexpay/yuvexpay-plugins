@@ -1,0 +1,61 @@
+{
+  "id": "meta-capi",
+  "name": "Meta Conversions API",
+  "version": "1.0.0",
+  "developer": "YuvexPay",
+  "description": "Envia conversoes server-side para o Meta (Facebook e Instagram) via Conversions API, com e-mail e telefone hasheados em SHA-256.",
+  "icon": "https://files.yuvex.dev/plugins/meta-capi.png",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "pixelId": {
+        "type": "string",
+        "title": "Pixel ID",
+        "description": "ID do seu pixel do Meta."
+      },
+      "accessToken": {
+        "type": "string",
+        "title": "Access Token",
+        "description": "Token de acesso da Conversions API.",
+        "secret": true
+      }
+    },
+    "required": ["pixelId", "accessToken"]
+  },
+  "events": ["payment.paid"],
+  "scopes": ["data", "tracking", "customer.contact", "customer.document"],
+  "egress": ["graph.facebook.com"],
+  "actions": [
+    {
+      "on": "payment.paid",
+      "request": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/{{ config.pixelId }}/events?access_token={{ config.accessToken }}",
+        "headers": {},
+        "body": {
+          "data": [
+            {
+              "event_name": "Purchase",
+              "event_id": "{{ event.data.payment.id }}",
+              "event_time": "{{ event.data.payment.paidAt | iso8601 }}",
+              "action_source": "website",
+              "user_data": {
+                "em": ["{{ event.customer.contact.email | trim | lower | sha256 }}"],
+                "ph": ["{{ event.customer.contact.phone | digits_only | sha256 }}"],
+                "external_id": ["{{ event.customer.document.value | digits_only | sha256 }}"],
+                "client_ip_address": "{{ event.tracking.clientIp }}",
+                "client_user_agent": "{{ event.tracking.userAgent }}",
+                "fbc": "{{ event.tracking.fbclid }}"
+              },
+              "custom_data": {
+                "currency": "{{ event.data.payment.currency }}",
+                "value": "{{ event.data.payment.amountCents | cents_to_decimal }}",
+                "order_id": "{{ event.data.payment.id }}"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

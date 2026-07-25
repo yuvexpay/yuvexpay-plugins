@@ -1,0 +1,172 @@
+{
+  "id": "utmify",
+  "name": "UTMify",
+  "version": "1.0.0",
+  "developer": "YuvexPay",
+  "description": "Envia pedidos e conversoes para a UTMify, atribuindo cada venda a origem do trafego (UTMs, src e sck).",
+  "icon": "https://files.yuvex.dev/plugins/utmify.png",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "apiToken": {
+        "type": "string",
+        "title": "API Token",
+        "description": "Token de API da sua conta UTMify.",
+        "secret": true
+      }
+    },
+    "required": ["apiToken"]
+  },
+  "events": ["payment.created", "payment.paid", "payment.refunded"],
+  "scopes": ["data", "tracking", "customer.contact", "customer.document"],
+  "egress": ["api.utmify.com.br"],
+  "actions": [
+    {
+      "on": "payment.created",
+      "request": {
+        "method": "POST",
+        "url": "https://api.utmify.com.br/api-credentials/orders",
+        "headers": { "x-api-token": "{{ config.apiToken }}" },
+        "body": {
+          "orderId": "{{ event.data.payment.id }}",
+          "platform": "YuvexPay",
+          "paymentMethod": "{{ event.data.payment.method }}",
+          "status": "waiting_payment",
+          "createdAt": "{{ event.data.payment.createdAt | iso8601 }}",
+          "approvedDate": null,
+          "refundedAt": null,
+          "customer": {
+            "name": "{{ event.customer.name }}",
+            "email": "{{ event.customer.contact.email }}",
+            "phone": "{{ event.customer.contact.phone }}",
+            "document": "{{ event.customer.document.value | digits_only }}",
+            "ip": "{{ event.tracking.clientIp }}"
+          },
+          "products": [
+            {
+              "id": "{{ event.data.payment.id }}",
+              "name": "{{ event.data.payment.description }}",
+              "planId": null,
+              "planName": null,
+              "quantity": 1,
+              "priceInCents": "{{ event.data.payment.amountCents }}"
+            }
+          ],
+          "trackingParameters": {
+            "src": "{{ event.tracking.src }}",
+            "sck": "{{ event.tracking.sck }}",
+            "utm_source": "{{ event.tracking.utmSource }}",
+            "utm_medium": "{{ event.tracking.utmMedium }}",
+            "utm_campaign": "{{ event.tracking.utmCampaign }}",
+            "utm_content": "{{ event.tracking.utmContent }}",
+            "utm_term": "{{ event.tracking.utmTerm }}"
+          },
+          "commission": {
+            "totalPriceInCents": "{{ event.data.payment.amountCents }}",
+            "gatewayFeeInCents": "{{ event.data.payment.feeCents }}",
+            "userCommissionInCents": "{{ event.data.payment.netAmountCents }}"
+          },
+          "isTest": false
+        }
+      }
+    },
+    {
+      "on": "payment.paid",
+      "request": {
+        "method": "POST",
+        "url": "https://api.utmify.com.br/api-credentials/orders",
+        "headers": { "x-api-token": "{{ config.apiToken }}" },
+        "body": {
+          "orderId": "{{ event.data.payment.id }}",
+          "platform": "YuvexPay",
+          "paymentMethod": "{{ event.data.payment.method }}",
+          "status": "paid",
+          "createdAt": "{{ event.data.payment.createdAt | iso8601 }}",
+          "approvedDate": "{{ event.data.payment.paidAt | iso8601 }}",
+          "refundedAt": null,
+          "customer": {
+            "name": "{{ event.customer.name }}",
+            "email": "{{ event.customer.contact.email }}",
+            "phone": "{{ event.customer.contact.phone }}",
+            "document": "{{ event.customer.document.value | digits_only }}",
+            "ip": "{{ event.tracking.clientIp }}"
+          },
+          "products": [
+            {
+              "id": "{{ event.data.payment.id }}",
+              "name": "{{ event.data.payment.description }}",
+              "planId": null,
+              "planName": null,
+              "quantity": 1,
+              "priceInCents": "{{ event.data.payment.amountCents }}"
+            }
+          ],
+          "trackingParameters": {
+            "src": "{{ event.tracking.src }}",
+            "sck": "{{ event.tracking.sck }}",
+            "utm_source": "{{ event.tracking.utmSource }}",
+            "utm_medium": "{{ event.tracking.utmMedium }}",
+            "utm_campaign": "{{ event.tracking.utmCampaign }}",
+            "utm_content": "{{ event.tracking.utmContent }}",
+            "utm_term": "{{ event.tracking.utmTerm }}"
+          },
+          "commission": {
+            "totalPriceInCents": "{{ event.data.payment.amountCents }}",
+            "gatewayFeeInCents": "{{ event.data.payment.feeCents }}",
+            "userCommissionInCents": "{{ event.data.payment.netAmountCents }}"
+          },
+          "isTest": false
+        }
+      }
+    },
+    {
+      "on": "payment.refunded",
+      "request": {
+        "method": "POST",
+        "url": "https://api.utmify.com.br/api-credentials/orders",
+        "headers": { "x-api-token": "{{ config.apiToken }}" },
+        "body": {
+          "orderId": "{{ event.data.payment.id }}",
+          "platform": "YuvexPay",
+          "paymentMethod": "{{ event.data.payment.method }}",
+          "status": "refunded",
+          "createdAt": "{{ event.data.payment.createdAt | iso8601 }}",
+          "approvedDate": "{{ event.data.payment.paidAt | iso8601 }}",
+          "refundedAt": "{{ event.createdAt | iso8601 }}",
+          "customer": {
+            "name": "{{ event.customer.name }}",
+            "email": "{{ event.customer.contact.email }}",
+            "phone": "{{ event.customer.contact.phone }}",
+            "document": "{{ event.customer.document.value | digits_only }}",
+            "ip": "{{ event.tracking.clientIp }}"
+          },
+          "products": [
+            {
+              "id": "{{ event.data.payment.id }}",
+              "name": "{{ event.data.payment.description }}",
+              "planId": null,
+              "planName": null,
+              "quantity": 1,
+              "priceInCents": "{{ event.data.payment.amountCents }}"
+            }
+          ],
+          "trackingParameters": {
+            "src": "{{ event.tracking.src }}",
+            "sck": "{{ event.tracking.sck }}",
+            "utm_source": "{{ event.tracking.utmSource }}",
+            "utm_medium": "{{ event.tracking.utmMedium }}",
+            "utm_campaign": "{{ event.tracking.utmCampaign }}",
+            "utm_content": "{{ event.tracking.utmContent }}",
+            "utm_term": "{{ event.tracking.utmTerm }}"
+          },
+          "commission": {
+            "totalPriceInCents": "{{ event.data.payment.amountCents }}",
+            "gatewayFeeInCents": "{{ event.data.payment.feeCents }}",
+            "userCommissionInCents": "{{ event.data.payment.netAmountCents }}"
+          },
+          "isTest": false
+        }
+      }
+    }
+  ]
+}

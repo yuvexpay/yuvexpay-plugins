@@ -1,0 +1,56 @@
+{
+  "id": "ga4",
+  "name": "Google Analytics 4",
+  "version": "1.0.0",
+  "developer": "YuvexPay",
+  "description": "Envia eventos de compra para o Google Analytics 4 via Measurement Protocol.",
+  "icon": "https://files.yuvex.dev/plugins/ga4.png",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "measurementId": {
+        "type": "string",
+        "title": "Measurement ID",
+        "description": "Identificador do fluxo de dados, no formato G-XXXXXXX."
+      },
+      "apiSecret": {
+        "type": "string",
+        "title": "API Secret",
+        "description": "Segredo da API do Measurement Protocol.",
+        "secret": true
+      }
+    },
+    "required": ["measurementId", "apiSecret"]
+  },
+  "events": ["payment.paid"],
+  "scopes": ["data", "tracking"],
+  "egress": ["www.google-analytics.com"],
+  "actions": [
+    {
+      "on": "payment.paid",
+      "request": {
+        "method": "POST",
+        "url": "https://www.google-analytics.com/mp/collect?measurement_id={{ config.measurementId }}&api_secret={{ config.apiSecret }}",
+        "headers": {},
+        "body": {
+          "client_id": "{{ event.data.payment.id }}",
+          "timestamp_micros": null,
+          "non_personalized_ads": false,
+          "events": [
+            {
+              "name": "purchase",
+              "params": {
+                "transaction_id": "{{ event.data.payment.id }}",
+                "currency": "{{ event.data.payment.currency }}",
+                "value": "{{ event.data.payment.amountCents | cents_to_decimal }}",
+                "campaign": "{{ event.tracking.utmCampaign }}",
+                "source": "{{ event.tracking.utmSource }}",
+                "medium": "{{ event.tracking.utmMedium }}"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
