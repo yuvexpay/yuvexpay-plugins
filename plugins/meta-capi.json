@@ -1,7 +1,7 @@
 {
   "id": "meta-capi",
   "name": "Meta Conversions API",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "developer": "YuvexPay",
   "description": "Envia conversoes server-side para o Meta (Facebook e Instagram) via Conversions API, com e-mail e telefone hasheados em SHA-256.",
   "icon": "https://cdn.yuvexpay.com/meta-capi.png",
@@ -18,6 +18,11 @@
         "title": "Access Token",
         "description": "Token de acesso da Conversions API.",
         "secret": true
+      },
+      "testEventCode": {
+        "type": "string",
+        "title": "Test Event Code",
+        "description": "Opcional. Preencha com o codigo TESTxxxxx do Gerenciador de Eventos para validar a integracao sem afetar os dados de producao."
       }
     },
     "required": ["pixelId", "accessToken"]
@@ -33,24 +38,31 @@
         "url": "https://graph.facebook.com/v21.0/{{ config.pixelId }}/events?access_token={{ config.accessToken }}",
         "headers": {},
         "body": {
+          "test_event_code": "{{ config.testEventCode }}",
           "data": [
             {
               "event_name": "Purchase",
               "event_id": "{{ event.data.payment.id }}",
-              "event_time": "{{ event.data.payment.paidAt | iso8601 }}",
+              "event_time": "{{ event.data.payment.paidAt | unix_seconds }}",
               "action_source": "website",
               "user_data": {
-                "em": ["{{ event.customer.contact.email | trim | lower | sha256 }}"],
-                "ph": ["{{ event.customer.contact.phone | digits_only | sha256 }}"],
-                "external_id": ["{{ event.customer.document.value | digits_only | sha256 }}"],
+                "em": "{{ event.customer.contact.email | trim | lower | sha256 }}",
+                "ph": "{{ event.customer.contact.phone | digits_only | sha256 }}",
+                "external_id": "{{ event.customer.document.value | digits_only | sha256 }}",
                 "client_ip_address": "{{ event.tracking.clientIp }}",
-                "client_user_agent": "{{ event.tracking.userAgent }}",
-                "fbc": "{{ event.tracking.fbclid }}"
+                "client_user_agent": "{{ event.tracking.userAgent }}"
               },
               "custom_data": {
                 "currency": "{{ event.data.payment.currency }}",
                 "value": "{{ event.data.payment.amountCents | cents_to_decimal }}",
-                "order_id": "{{ event.data.payment.id }}"
+                "order_id": "{{ event.data.payment.id }}",
+                "contents": [
+                  {
+                    "id": "{{ event.data.payment.id }}",
+                    "quantity": 1,
+                    "item_price": "{{ event.data.payment.amountCents | cents_to_decimal }}"
+                  }
+                ]
               }
             }
           ]

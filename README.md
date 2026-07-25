@@ -92,12 +92,54 @@ Use `{{ ... }}` to read from `event.*` and `config.*`. Values may be piped throu
 | `lower` | lowercase |
 | `trim` | strip surrounding whitespace |
 | `digits_only` | remove every non-digit |
-| `cents_to_decimal` | `4990` becomes `"49.90"` |
+| `cents_to_decimal` | `4990` becomes the number `49.9` |
 | `iso8601` | normalize to an ISO-8601 UTC timestamp |
+| `datetime_utc` | `YYYY-MM-DD HH:MM:SS` in UTC |
+| `unix_seconds` | integer Unix seconds |
+| `not` | boolean negation |
+| `value_map:K=V,...` | translate a value to a provider enum, optional `*=fallback` |
+| `fallback:pathOrLiteral` | substitute when the value is null or blank |
+| `ga_client_id` | normalize a `_ga` cookie, or derive a deterministic client id |
 
 Functions chain left to right: `{{ event.customer.contact.email | trim | lower | sha256 }}`.
 
+Two functions take an argument after a colon. `value_map` maps a value onto the enum a provider accepts, and falls back to `*` when given:
+
+```
+{{ event.data.payment.method | value_map:PIX=pix,CARD=credit_card,BOLETO=boleto,*=unknown }}
+```
+
+`fallback` substitutes another path — or a literal, when the argument is not rooted at `event` or `config`:
+
+```
+{{ event.data.payment.description | fallback:Pagamento YuvexPay }}
+```
+
 There are no loops, no conditionals, and no arbitrary expressions. A missing value stays `null` through the whole chain — it is never coerced into a hash of the empty string.
+
+**Numbers stay numbers.** When a whole string is a single expression, the rendered value keeps its native JSON type. `"value": "{{ ... | cents_to_decimal }}"` sends `49.9`, not `"49.9"` — GA4 and Meta reject a stringified monetary value.
+
+## Skipping an action
+
+An action may declare `requires`, a list of dotted event paths that must be non-null for it to fire:
+
+```json
+{
+  "on": "payment.created",
+  "requires": ["event.customer.name", "event.customer.contact.email"],
+  "request": { "...": "..." }
+}
+```
+
+If any path is null or blank at delivery time, the delivery is recorded as `SKIPPED` and nothing is sent. `SKIPPED` is a terminal status distinct from `FAILED` — it is not an error and does not count as a failure.
+
+This is how a provider with mandatory fields stays correct. On hosted checkout the payer fills in their contact details *after* the charge is created, so `payment.created` has no email yet; the action skips cleanly instead of posting a null and getting a `400`.
+
+## Tests
+
+`npm test` renders every manifest against a synthetic canonical event and asserts the output against each provider's documented schema — enum values, required non-null fields, date formats, and numeric-not-string types.
+
+The renderer in `scripts/render.mjs` is a port of the backend template engine. Like `scripts/validate.mjs`, it duplicates backend logic on purpose so this repository can be validated on its own; both must be updated when the backend template engine changes.
 
 ## Security rules
 
@@ -108,7 +150,7 @@ CI rejects a manifest that breaks any of these, so a merged pull request cannot 
 - `egress` entries must be bare, lowercase, fully-qualified hosts — no scheme, port, or path.
 - Private, loopback, link-local and cloud-metadata ranges are rejected, including `169.254.169.254`.
 - First-party YuvexPay infrastructure is rejected.
-- Only the six functions above are allowed. `__proto__`, `constructor` and `prototype` path segments are rejected.
+- Only the functions listed above are allowed. `__proto__`, `constructor` and `prototype` path segments are rejected, in `requires` entries as well as in expressions.
 - Only published event types are allowed.
 
 ## Local checks
