@@ -22,6 +22,8 @@ const TEMPLATE_FUNCTIONS = new Set([
   "iso8601",
 ]);
 
+const ICON_HOST_ALLOWLIST = ["cdn.yuvexpay.com"];
+
 const BLOCKED_BASE_DOMAINS = ["yuvexpay.com", "yuvex.dev"];
 
 const PRIVATE_HOSTNAME_PATTERNS = [
@@ -138,6 +140,19 @@ function validateExpression(expression, issues, where) {
   }
 }
 
+function isSafeIconUrl(raw) {
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol.toLowerCase() !== "https:") return false;
+  const host = parsed.hostname.toLowerCase().replace(/\.+$/, "");
+  if (isPrivateHost(host)) return false;
+  return ICON_HOST_ALLOWLIST.includes(host);
+}
+
 function validateManifest(file, manifest) {
   const issues = [];
   const where = (suffix) => `${file}${suffix}`;
@@ -146,6 +161,12 @@ function validateManifest(file, manifest) {
   if (manifest.id !== expectedId) {
     issues.push(
       `${file}: manifest id "${manifest.id}" must match the filename "${expectedId}"`,
+    );
+  }
+
+  if (manifest.icon !== undefined && !isSafeIconUrl(manifest.icon)) {
+    issues.push(
+      `${file}: icon must be an https url on one of: ${ICON_HOST_ALLOWLIST.join(", ")}`,
     );
   }
 
