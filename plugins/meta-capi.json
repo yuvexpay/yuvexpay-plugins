@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "developer": "YuvexPay",
   "description": "Envia conversoes server-side para o Meta (Facebook e Instagram) via Conversions API, com e-mail e telefone hasheados em SHA-256.",
-  "icon": "https://files.yuvex.dev/plugins/meta-capi.png",
+  "icon": "https://cdn.yuvexpay.com/meta-capi.png",
   "configSchema": {
     "type": "object",
     "properties": {

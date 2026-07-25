@@ -1,0 +1,41 @@
+name: publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/**'
+      - '.github/workflows/publish.yml'
+      - 'scripts/publish.mjs'
+  workflow_dispatch:
+
+concurrency:
+  group: "publish-main"
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: publish
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+
+      - name: Validate before publishing
+        run: |
+          npm run validate:schema
+          npm run validate
+
+      - name: Publish to production
+        env:
+          PLUGIN_PUBLISH_URL: ${{ secrets.PLUGIN_PUBLISH_URL }}
+          PLUGIN_PUBLISH_TOKEN: ${{ secrets.PLUGIN_PUBLISH_TOKEN }}
+        run: npm run publish:prod

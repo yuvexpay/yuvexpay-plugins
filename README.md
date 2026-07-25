@@ -4,6 +4,20 @@ Community plugin manifests for the YuvexPay app store.
 
 A plugin is a single declarative JSON file. It maps a YuvexPay event onto an outbound HTTP request. There is no code to write and no code to run — the manifest is data, and YuvexPay executes it.
 
+## How a manifest reaches production
+
+1. You open a pull request.
+2. CI validates the JSON Schema and the security rules.
+3. A maintainer approves (CODEOWNERS; manifest changes require security review).
+4. GitHub auto-merge merges once checks are green and the approval is in.
+5. A post-merge workflow publishes every manifest on `main` to production.
+
+The backend **re-validates every manifest server-side** before storing it — schema, egress allowlist and SSRF rules are enforced again there. Repo CI is a fast signal, not the security boundary.
+
+This repository is the single source of truth. A manifest deleted here is disabled in production on the next publish; it is never hard-deleted, so existing installs stop receiving events without erroring.
+
+Installed merchants stay pinned to the plugin version they installed. Publishing a new version does not change behaviour for existing installs.
+
 ## Contributing
 
 1. Fork this repository.
