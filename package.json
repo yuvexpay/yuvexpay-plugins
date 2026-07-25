@@ -7,7 +7,8 @@
   "license": "MIT",
   "scripts": {
     "validate": "node scripts/validate.mjs",
-    "validate:schema": "ajv validate -s schema/manifest.schema.json -d \"plugins/*.json\" --spec=draft2020 --strict=false --all-errors"
+    "validate:schema": "ajv validate -s schema/manifest.schema.json -d \"plugins/*.json\" --spec=draft2020 --strict=false --all-errors",
+    "publish:prod": "node scripts/publish.mjs"
   },
   "devDependencies": {
     "ajv-cli": "^5.0.0"

@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "developer": "YuvexPay",
   "description": "Envia pedidos e conversoes para a UTMify, atribuindo cada venda a origem do trafego (UTMs, src e sck).",
-  "icon": "https://files.yuvex.dev/plugins/utmify.png",
+  "icon": "https://cdn.yuvexpay.com/utmify.png",
   "configSchema": {
     "type": "object",
     "properties": {
