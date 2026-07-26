@@ -1,7 +1,7 @@
 {
   "id": "utmify",
   "name": "UTMify",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "developer": "YuvexPay",
   "description": "Envia pedidos e conversoes para a UTMify, atribuindo cada venda a origem do trafego (UTMs, src e sck).",
   "icon": "https://cdn.yuvexpay.com/utmify.png",
@@ -23,6 +23,7 @@
   "actions": [
     {
       "on": "payment.created",
+      "requires": ["event.customer.name", "event.customer.contact.email"],
       "request": {
         "method": "POST",
         "url": "https://api.utmify.com.br/api-credentials/orders",
@@ -30,9 +31,9 @@
         "body": {
           "orderId": "{{ event.data.payment.id }}",
           "platform": "YuvexPay",
-          "paymentMethod": "{{ event.data.payment.method }}",
+          "paymentMethod": "{{ event.data.payment.method | value_map:PIX=pix,CARD=credit_card,BOLETO=boleto,*=unknown }}",
           "status": "waiting_payment",
-          "createdAt": "{{ event.data.payment.createdAt | iso8601 }}",
+          "createdAt": "{{ event.data.payment.createdAt | datetime_utc }}",
           "approvedDate": null,
           "refundedAt": null,
           "customer": {
@@ -45,7 +46,7 @@
           "products": [
             {
               "id": "{{ event.data.payment.id }}",
-              "name": "{{ event.data.payment.description }}",
+              "name": "{{ event.data.payment.description | fallback:Pagamento YuvexPay }}",
               "planId": null,
               "planName": null,
               "quantity": 1,
@@ -64,14 +65,16 @@
           "commission": {
             "totalPriceInCents": "{{ event.data.payment.amountCents }}",
             "gatewayFeeInCents": "{{ event.data.payment.feeCents }}",
-            "userCommissionInCents": "{{ event.data.payment.netAmountCents }}"
+            "userCommissionInCents": "{{ event.data.payment.netAmountCents }}",
+            "currency": "BRL"
           },
-          "isTest": false
+          "isTest": "{{ event.livemode | not }}"
         }
       }
     },
     {
       "on": "payment.paid",
+      "requires": ["event.customer.name", "event.customer.contact.email"],
       "request": {
         "method": "POST",
         "url": "https://api.utmify.com.br/api-credentials/orders",
@@ -79,10 +82,10 @@
         "body": {
           "orderId": "{{ event.data.payment.id }}",
           "platform": "YuvexPay",
-          "paymentMethod": "{{ event.data.payment.method }}",
+          "paymentMethod": "{{ event.data.payment.method | value_map:PIX=pix,CARD=credit_card,BOLETO=boleto,*=unknown }}",
           "status": "paid",
-          "createdAt": "{{ event.data.payment.createdAt | iso8601 }}",
-          "approvedDate": "{{ event.data.payment.paidAt | iso8601 }}",
+          "createdAt": "{{ event.data.payment.createdAt | datetime_utc }}",
+          "approvedDate": "{{ event.data.payment.paidAt | datetime_utc }}",
           "refundedAt": null,
           "customer": {
             "name": "{{ event.customer.name }}",
@@ -94,7 +97,7 @@
           "products": [
             {
               "id": "{{ event.data.payment.id }}",
-              "name": "{{ event.data.payment.description }}",
+              "name": "{{ event.data.payment.description | fallback:Pagamento YuvexPay }}",
               "planId": null,
               "planName": null,
               "quantity": 1,
@@ -113,14 +116,16 @@
           "commission": {
             "totalPriceInCents": "{{ event.data.payment.amountCents }}",
             "gatewayFeeInCents": "{{ event.data.payment.feeCents }}",
-            "userCommissionInCents": "{{ event.data.payment.netAmountCents }}"
+            "userCommissionInCents": "{{ event.data.payment.netAmountCents }}",
+            "currency": "BRL"
           },
-          "isTest": false
+          "isTest": "{{ event.livemode | not }}"
         }
       }
     },
     {
       "on": "payment.refunded",
+      "requires": ["event.customer.name", "event.customer.contact.email"],
       "request": {
         "method": "POST",
         "url": "https://api.utmify.com.br/api-credentials/orders",
@@ -128,11 +133,11 @@
         "body": {
           "orderId": "{{ event.data.payment.id }}",
           "platform": "YuvexPay",
-          "paymentMethod": "{{ event.data.payment.method }}",
+          "paymentMethod": "{{ event.data.payment.method | value_map:PIX=pix,CARD=credit_card,BOLETO=boleto,*=unknown }}",
           "status": "refunded",
-          "createdAt": "{{ event.data.payment.createdAt | iso8601 }}",
-          "approvedDate": "{{ event.data.payment.paidAt | iso8601 }}",
-          "refundedAt": "{{ event.createdAt | iso8601 }}",
+          "createdAt": "{{ event.data.payment.createdAt | datetime_utc }}",
+          "approvedDate": "{{ event.data.payment.paidAt | datetime_utc }}",
+          "refundedAt": "{{ event.createdAt | datetime_utc }}",
           "customer": {
             "name": "{{ event.customer.name }}",
             "email": "{{ event.customer.contact.email }}",
@@ -143,7 +148,7 @@
           "products": [
             {
               "id": "{{ event.data.payment.id }}",
-              "name": "{{ event.data.payment.description }}",
+              "name": "{{ event.data.payment.description | fallback:Pagamento YuvexPay }}",
               "planId": null,
               "planName": null,
               "quantity": 1,
@@ -162,9 +167,10 @@
           "commission": {
             "totalPriceInCents": "{{ event.data.payment.amountCents }}",
             "gatewayFeeInCents": "{{ event.data.payment.feeCents }}",
-            "userCommissionInCents": "{{ event.data.payment.netAmountCents }}"
+            "userCommissionInCents": "{{ event.data.payment.netAmountCents }}",
+            "currency": "BRL"
           },
-          "isTest": false
+          "isTest": "{{ event.livemode | not }}"
         }
       }
     }

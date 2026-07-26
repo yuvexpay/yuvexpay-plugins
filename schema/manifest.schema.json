@@ -107,6 +107,17 @@
               "med.opened"
             ]
           },
+          "requires": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 200,
+              "pattern": "^(event|config)\\.[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$",
+              "description": "Dotted event path that must be non-null for the action to fire. Otherwise the delivery is recorded SKIPPED and nothing is sent."
+            }
+          },
           "request": {
             "type": "object",
             "additionalProperties": false,

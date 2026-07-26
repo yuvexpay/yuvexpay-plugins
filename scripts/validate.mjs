@@ -20,7 +20,17 @@ const TEMPLATE_FUNCTIONS = new Set([
   "digits_only",
   "cents_to_decimal",
   "iso8601",
+  "datetime_utc",
+  "unix_seconds",
+  "not",
+  "value_map",
+  "fallback",
+  "ga_client_id",
 ]);
+
+const PARAMETRIZED_TEMPLATE_FUNCTIONS = new Set(["value_map", "fallback"]);
+
+const FORBIDDEN_PATH_SEGMENTS = ["__proto__", "constructor", "prototype"];
 
 const ICON_HOST_ALLOWLIST = ["cdn.yuvexpay.com"];
 
@@ -126,16 +136,73 @@ function validateExpression(expression, issues, where) {
   }
 
   for (const segment of path.split(".")) {
-    if (["__proto__", "constructor", "prototype"].includes(segment)) {
+    if (FORBIDDEN_PATH_SEGMENTS.includes(segment)) {
       issues.push(`${where}: forbidden path segment "${segment}"`);
     }
   }
 
   for (const fn of functions) {
-    if (!TEMPLATE_FUNCTIONS.has(fn)) {
+    const separator = fn.indexOf(":");
+    const name = (separator === -1 ? fn : fn.slice(0, separator)).trim();
+    const arg = separator === -1 ? null : fn.slice(separator + 1).trim();
+
+    if (!TEMPLATE_FUNCTIONS.has(name)) {
       issues.push(
-        `${where}: unknown function "${fn}" (allowed: ${[...TEMPLATE_FUNCTIONS].join(", ")})`,
+        `${where}: unknown function "${name}" (allowed: ${[...TEMPLATE_FUNCTIONS].join(", ")})`,
       );
+      continue;
+    }
+
+    const takesArgument = PARAMETRIZED_TEMPLATE_FUNCTIONS.has(name);
+    if (takesArgument && !arg) {
+      issues.push(`${where}: function "${name}" requires an argument, written as ${name}:...`);
+      continue;
+    }
+    if (!takesArgument && arg !== null) {
+      issues.push(`${where}: function "${name}" does not take an argument`);
+      continue;
+    }
+
+    if (name === "value_map") {
+      const pairs = arg
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+      if (pairs.length === 0) {
+        issues.push(`${where}: value_map requires at least one key=value pair`);
+      }
+      for (const pair of pairs) {
+        const eq = pair.indexOf("=");
+        if (eq <= 0 || pair.slice(eq + 1).trim().length === 0) {
+          issues.push(`${where}: value_map entry "${pair}" must be written as key=value`);
+        }
+      }
+    }
+  }
+}
+
+function validateRequires(requires, issues, where) {
+  if (requires === undefined) return;
+
+  if (!Array.isArray(requires)) {
+    issues.push(`${where}: requires must be an array of dotted event paths`);
+    return;
+  }
+
+  for (const path of requires) {
+    if (typeof path !== "string" || path.length === 0) {
+      issues.push(`${where}: every requires entry must be a non-empty string`);
+      continue;
+    }
+    const segments = path.split(".");
+    if (segments[0] !== "event" && segments[0] !== "config") {
+      issues.push(`${where}: requires entry "${path}" must start with "event." or "config."`);
+    }
+    if (segments.length < 2 || segments.some((segment) => segment.length === 0)) {
+      issues.push(`${where}: requires entry "${path}" has an empty path segment`);
+    }
+    if (segments.some((segment) => FORBIDDEN_PATH_SEGMENTS.includes(segment))) {
+      issues.push(`${where}: requires entry "${path}" traverses the prototype chain`);
     }
   }
 }
@@ -226,6 +293,8 @@ function validateManifest(file, manifest) {
     if (/\{\{/.test(new URL(url, "https://placeholder.invalid").hostname)) {
       issues.push(`${label}: the url host must be a literal, not a template`);
     }
+
+    validateRequires(action.requires, issues, label);
 
     for (const expression of collectExpressions(action.request ?? {})) {
       validateExpression(expression, issues, label);

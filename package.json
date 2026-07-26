@@ -6,6 +6,7 @@
   "description": "Community plugin manifests for the YuvexPay app store",
   "license": "MIT",
   "scripts": {
+    "test": "node --test \"tests/**/*.test.mjs\"",
     "validate": "node scripts/validate.mjs",
     "validate:schema": "ajv validate -s schema/manifest.schema.json -d \"plugins/*.json\" --spec=draft2020 --strict=false --all-errors",
     "publish:prod": "node scripts/publish.mjs"
