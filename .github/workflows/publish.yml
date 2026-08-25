@@ -25,13 +25,21 @@ jobs:
     needs: [validate]
     if: "${{ github.ref == 'refs/heads/main' }}"
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment: production
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
+        id: node
         with:
           node-version: '22'
-      - run: npm ci
+      - uses: actions/cache@v4
+        id: modules
+        with:
+          path: node_modules
+          key: modules-${{ runner.os }}-${{ steps.node.outputs.node-version }}-${{ hashFiles('package-lock.json') }}
+      - if: "${{ steps.modules.outputs.cache-hit != 'true' }}"
+        run: npm ci
 
       - name: Validate before publishing
         run: |
