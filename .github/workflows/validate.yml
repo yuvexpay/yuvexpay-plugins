@@ -17,32 +17,56 @@ jobs:
   schema:
     name: schema
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
+        id: node
         with:
           node-version: '22'
-      - run: npm ci
+      - uses: actions/cache@v4
+        id: modules
+        with:
+          path: node_modules
+          key: modules-${{ runner.os }}-${{ steps.node.outputs.node-version }}-${{ hashFiles('package-lock.json') }}
+      - if: "${{ steps.modules.outputs.cache-hit != 'true' }}"
+        run: npm ci
       - run: npm run validate:schema
 
   security:
     name: security
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
+        id: node
         with:
           node-version: '22'
-      - run: npm ci
+      - uses: actions/cache@v4
+        id: modules
+        with:
+          path: node_modules
+          key: modules-${{ runner.os }}-${{ steps.node.outputs.node-version }}-${{ hashFiles('package-lock.json') }}
+      - if: "${{ steps.modules.outputs.cache-hit != 'true' }}"
+        run: npm ci
       - run: npm run validate
 
   contract:
     name: contract
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
+        id: node
         with:
           node-version: '22'
-      - run: npm ci
+      - uses: actions/cache@v4
+        id: modules
+        with:
+          path: node_modules
+          key: modules-${{ runner.os }}-${{ steps.node.outputs.node-version }}-${{ hashFiles('package-lock.json') }}
+      - if: "${{ steps.modules.outputs.cache-hit != 'true' }}"
+        run: npm ci
       - run: npm test
