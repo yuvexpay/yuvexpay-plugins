@@ -95,6 +95,8 @@ Config values marked `secret: true` are stored encrypted, and redacted from the 
 | `payment.refunded` | a charge was refunded |
 | `withdrawal.paid` | a withdrawal settled |
 | `med.opened` | a PIX dispute (MED) was opened |
+| `checkout.abandoned` | a payer filled in the checkout and had not paid N minutes later (30 by default) |
+| `payment.free` | an order was completed at R$ 0 with a 100% coupon |
 
 ## Scopes
 

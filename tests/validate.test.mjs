@@ -99,6 +99,19 @@ describe("published manifests", () => {
   }
 });
 
+describe("events", () => {
+  for (const event of ["checkout.abandoned", "payment.free"]) {
+    test(`an action on ${event} is accepted`, () => {
+      const manifest = v1Manifest();
+      manifest.events = [event];
+      manifest.actions[0].on = event;
+      const result = check(manifest);
+      assert.equal(result.schema, true, JSON.stringify(schemaAccepts.errors));
+      assert.deepEqual(result.issues, []);
+    });
+  }
+});
+
 describe("manifestVersion 2", () => {
   test("a manifest with flows, conditions, step outputs and a schedule is accepted", () => {
     const result = check(v2Manifest());

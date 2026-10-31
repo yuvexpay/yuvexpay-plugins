@@ -111,7 +111,9 @@
         "payment.paid",
         "payment.refunded",
         "withdrawal.paid",
-        "med.opened"
+        "med.opened",
+        "checkout.abandoned",
+        "payment.free"
       ]
     },
     "noPrototypeSegment": {

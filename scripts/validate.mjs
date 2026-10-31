@@ -19,6 +19,8 @@ export const PUBLISHED_EVENTS = [
   "payment.refunded",
   "withdrawal.paid",
   "med.opened",
+  "checkout.abandoned",
+  "payment.free",
 ];
 
 export const SCOPES = ["data", "tracking", "customer.contact", "customer.document"];
