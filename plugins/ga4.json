@@ -1,7 +1,7 @@
 {
   "id": "ga4",
   "name": "Google Analytics 4",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "developer": "YuvexPay",
   "description": "Envia eventos de compra para o Google Analytics 4 via Measurement Protocol.",
   "icon": "https://cdn.yuvexpay.com/ga4.png",
@@ -33,7 +33,9 @@
         "url": "https://www.google-analytics.com/mp/collect?measurement_id={{ config.measurementId }}&api_secret={{ config.apiSecret }}",
         "headers": {},
         "body": {
-          "client_id": "{{ event.tracking.ga | fallback:event.data.payment.id | ga_client_id }}",
+          "client_id": "{{ event.tracking.gaClientId | fallback:event.customer.id | fallback:event.data.payment.id | ga_client_id }}",
+          "ip_override": "{{ event.tracking.clientIp }}",
+          "user_agent": "{{ event.tracking.userAgent }}",
           "events": [
             {
               "name": "purchase",
@@ -42,9 +44,6 @@
                 "currency": "{{ event.data.payment.currency }}",
                 "value": "{{ event.data.payment.amountCents | cents_to_decimal }}",
                 "engagement_time_msec": 1,
-                "campaign": "{{ event.tracking.utmCampaign }}",
-                "source": "{{ event.tracking.utmSource }}",
-                "medium": "{{ event.tracking.utmMedium }}",
                 "items": [
                   {
                     "item_id": "{{ event.data.payment.id }}",

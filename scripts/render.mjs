@@ -1,9 +1,14 @@
 import { createHash } from "node:crypto";
 
-const EXPRESSION = /\{\{\s*([^}]+?)\s*\}\}/g;
-const FULL_EXPRESSION = /^\{\{\s*([^}]+?)\s*\}\}$/;
+export const MAX_TEMPLATE_DEPTH = 12;
+export const MAX_RENDERED_STRING_LENGTH = 8192;
+export const MAX_TEMPLATE_INPUT_LENGTH = 8192;
+export const MAX_TEMPLATE_EXPRESSIONS = 64;
+export const MAX_TEMPLATE_EXPRESSION_LENGTH = 512;
 
-const TEMPLATE_FUNCTIONS = new Set([
+export const TEMPLATE_ROOTS = ["event", "config", "steps"];
+
+export const TEMPLATE_FUNCTIONS = [
   "sha256",
   "lower",
   "trim",
@@ -16,11 +21,53 @@ const TEMPLATE_FUNCTIONS = new Set([
   "value_map",
   "fallback",
   "ga_client_id",
-]);
+];
 
-const PARAMETRIZED_TEMPLATE_FUNCTIONS = new Set(["value_map", "fallback"]);
+export const PARAMETRIZED_TEMPLATE_FUNCTIONS = ["value_map", "fallback"];
+
+export const FORBIDDEN_PATH_SEGMENTS = ["__proto__", "constructor", "prototype"];
+
+export const CONTACT_METADATA_KEYS = ["payerEmail", "payerPhone"];
 
 export class TemplateError extends Error {}
+
+function scanExpressions(input) {
+  const spans = [];
+  let cursor = 0;
+
+  while (cursor < input.length) {
+    const open = input.indexOf("{{", cursor);
+    if (open === -1) break;
+
+    let scan = open + 2;
+    while (scan < input.length && input[scan] !== "}") scan++;
+
+    if (scan >= input.length) {
+      throw new TemplateError('template has an unterminated "{{" expression with no closing "}}"');
+    }
+    if (input[scan + 1] !== "}") {
+      throw new TemplateError('template expression opened with "{{" is not closed by "}}"');
+    }
+    if (scan === open + 2) {
+      throw new TemplateError('template has an empty "{{}}" expression');
+    }
+    if (scan - (open + 2) > MAX_TEMPLATE_EXPRESSION_LENGTH) {
+      throw new TemplateError("template expression exceeds the maximum length");
+    }
+
+    spans.push({ start: open, end: scan + 2, raw: input.slice(open + 2, scan) });
+    if (spans.length > MAX_TEMPLATE_EXPRESSIONS) {
+      throw new TemplateError("template string has too many expressions");
+    }
+    cursor = scan + 2;
+  }
+
+  return spans;
+}
+
+export function extractExpressions(input) {
+  return scanExpressions(input).map((span) => span.raw.trim());
+}
 
 function stringify(value) {
   if (value === null || value === undefined) return "";
@@ -43,14 +90,16 @@ function toDate(value) {
 function resolvePath(context, path) {
   const segments = path.split(".").map((segment) => segment.trim());
   const root = segments[0];
-  if (root !== "event" && root !== "config") {
-    throw new TemplateError(`expression root must be "event" or "config", got "${root}"`);
+  if (!TEMPLATE_ROOTS.includes(root)) {
+    throw new TemplateError(
+      `expression root must be "event", "config" or "steps", got "${root ?? ""}"`,
+    );
   }
 
   let current = context[root];
   for (const segment of segments.slice(1)) {
     if (segment.length === 0) throw new TemplateError(`empty path segment in "${path}"`);
-    if (["__proto__", "constructor", "prototype"].includes(segment)) {
+    if (FORBIDDEN_PATH_SEGMENTS.includes(segment)) {
       throw new TemplateError(`forbidden path segment "${segment}"`);
     }
     if (current === null || current === undefined) return undefined;
@@ -60,7 +109,7 @@ function resolvePath(context, path) {
   return current;
 }
 
-function parseValueMap(arg) {
+export function parseValueMap(arg) {
   const map = new Map();
   for (const entry of arg.split(",")) {
     const trimmed = entry.trim();
@@ -82,7 +131,7 @@ function parseValueMap(arg) {
 
 function resolveFallback(context, arg) {
   const root = arg.split(".")[0];
-  if (root === "event" || root === "config") {
+  if (TEMPLATE_ROOTS.includes(root)) {
     const resolved = resolvePath(context, arg);
     return resolved === undefined ? null : resolved;
   }
@@ -150,16 +199,16 @@ function applyFunction(name, arg, value, context) {
   }
 }
 
-function parseFunctionCall(raw) {
+export function parseFunctionCall(raw) {
   const separator = raw.indexOf(":");
   const name = (separator === -1 ? raw : raw.slice(0, separator)).trim();
   const arg = separator === -1 ? null : raw.slice(separator + 1).trim();
 
-  if (!TEMPLATE_FUNCTIONS.has(name)) throw new TemplateError(`unknown function "${name}"`);
+  if (!TEMPLATE_FUNCTIONS.includes(name)) throw new TemplateError(`unknown function "${name}"`);
 
-  const takesArgument = PARAMETRIZED_TEMPLATE_FUNCTIONS.has(name);
-  if (takesArgument && !arg) {
-    throw new TemplateError(`function "${name}" requires an argument`);
+  const takesArgument = PARAMETRIZED_TEMPLATE_FUNCTIONS.includes(name);
+  if (takesArgument && (arg === null || arg.length === 0)) {
+    throw new TemplateError(`function "${name}" requires an argument, written as ${name}:...`);
   }
   if (!takesArgument && arg !== null) {
     throw new TemplateError(`function "${name}" does not take an argument`);
@@ -172,7 +221,7 @@ export function evaluateExpression(context, raw) {
   const parts = raw
     .split("|")
     .map((part) => part.trim())
-    .filter(Boolean);
+    .filter((part) => part.length > 0);
 
   if (parts.length === 0) throw new TemplateError("empty expression");
 
@@ -187,34 +236,100 @@ export function evaluateExpression(context, raw) {
   return value;
 }
 
-function renderString(context, input) {
-  const full = input.match(FULL_EXPRESSION);
-  if (full) {
-    const value = evaluateExpression(context, full[1]);
-    return value === undefined ? null : value;
+function assertRenderedSize(value) {
+  if (stringify(value).length > MAX_RENDERED_STRING_LENGTH) {
+    throw new TemplateError("rendered value exceeds the maximum length");
   }
-  return input.replace(EXPRESSION, (_match, expression) =>
-    stringify(evaluateExpression(context, expression)),
-  );
 }
 
-export function renderTemplate(context, node) {
+export function renderString(context, input) {
+  if (input.length > MAX_TEMPLATE_INPUT_LENGTH) {
+    throw new TemplateError("template string exceeds the maximum length");
+  }
+
+  const spans = scanExpressions(input);
+  if (spans.length === 0) return input;
+
+  const only = spans[0];
+  if (spans.length === 1 && only.start === 0 && only.end === input.length) {
+    const value = evaluateExpression(context, only.raw.trim());
+    if (value === undefined || value === null) return null;
+    assertRenderedSize(value);
+    return value;
+  }
+
+  let rendered = "";
+  let cursor = 0;
+  for (const span of spans) {
+    rendered += input.slice(cursor, span.start);
+    rendered += stringify(evaluateExpression(context, span.raw.trim()));
+    cursor = span.end;
+  }
+  rendered += input.slice(cursor);
+
+  if (rendered.length > MAX_RENDERED_STRING_LENGTH) {
+    throw new TemplateError("rendered value exceeds the maximum length");
+  }
+
+  return rendered;
+}
+
+export function renderTemplate(context, node, depth = 0) {
+  if (depth > MAX_TEMPLATE_DEPTH) {
+    throw new TemplateError("template nesting exceeds the maximum depth");
+  }
+
   if (typeof node === "string") return renderString(context, node);
   if (node === null || typeof node === "number" || typeof node === "boolean") return node;
-  if (Array.isArray(node)) return node.map((item) => renderTemplate(context, item));
+  if (Array.isArray(node)) return node.map((item) => renderTemplate(context, item, depth + 1));
   if (typeof node === "object") {
     const out = {};
     for (const [key, value] of Object.entries(node)) {
-      out[key] = renderTemplate(context, value);
+      if (FORBIDDEN_PATH_SEGMENTS.includes(key)) {
+        throw new TemplateError(`forbidden template key "${key}"`);
+      }
+      out[String(renderString(context, key))] = renderTemplate(context, value, depth + 1);
     }
     return out;
   }
   return null;
 }
 
+export function renderHeaders(context, headers) {
+  const out = {};
+  for (const [key, value] of Object.entries(headers ?? {})) {
+    out[key] = stringify(renderString(context, value));
+  }
+  return out;
+}
+
+function asObject(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "object" || Array.isArray(value)) return null;
+  return value;
+}
+
+function withoutContactMetadata(data) {
+  const dataObject = asObject(data);
+  if (!dataObject) return data;
+
+  const payment = asObject(dataObject.payment);
+  if (!payment) return data;
+
+  const metadata = asObject(payment.metadata);
+  if (!metadata) return data;
+
+  if (!CONTACT_METADATA_KEYS.some((key) => key in metadata)) return data;
+
+  const scrubbed = { ...metadata };
+  for (const key of CONTACT_METADATA_KEYS) delete scrubbed[key];
+
+  return { ...dataObject, payment: { ...payment, metadata: scrubbed } };
+}
+
 export function materializeScopedEvent(envelope, scopes) {
   const granted = new Set(scopes);
-  const customer = envelope.customer ?? null;
+  const customer = asObject(envelope.customer);
 
   return {
     id: envelope.id,
@@ -223,7 +338,11 @@ export function materializeScopedEvent(envelope, scopes) {
     createdAt: envelope.createdAt,
     companyId: envelope.companyId,
     livemode: envelope.livemode,
-    data: granted.has("data") ? (envelope.data ?? null) : null,
+    data: granted.has("data")
+      ? granted.has("customer.contact")
+        ? (envelope.data ?? null)
+        : withoutContactMetadata(envelope.data ?? null)
+      : null,
     tracking: granted.has("tracking") ? (envelope.tracking ?? null) : null,
     customer: customer
       ? {
@@ -258,12 +377,16 @@ export function renderAction(manifest, action, envelope, config) {
   };
 
   const missing = missingRequiredPaths(context, action.requires);
-  if (missing.length > 0) return { skipped: true, missing, body: null, url: null };
+  if (missing.length > 0) {
+    return { skipped: true, missing, url: null, headers: null, body: null };
+  }
 
   return {
     skipped: false,
     missing: [],
     url: String(renderTemplate(context, action.request.url)),
-    body: renderTemplate(context, action.request.body),
+    headers: renderHeaders(context, action.request.headers),
+    body:
+      action.request.body === undefined ? undefined : renderTemplate(context, action.request.body),
   };
 }

@@ -4,23 +4,14 @@
   "title": "YuvexPay plugin manifest",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "id",
-    "name",
-    "version",
-    "developer",
-    "configSchema",
-    "events",
-    "scopes",
-    "egress",
-    "actions"
-  ],
+  "required": ["id", "name", "version", "developer", "configSchema", "scopes", "egress"],
   "properties": {
+    "manifestVersion": {
+      "const": 2,
+      "description": "Omit for a v1 manifest. 2 enables flows."
+    },
     "id": {
-      "type": "string",
-      "minLength": 2,
-      "maxLength": 64,
-      "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+      "$ref": "#/$defs/slug",
       "description": "Lowercase kebab-case identifier. Must match the manifest filename."
     },
     "name": { "type": "string", "minLength": 1, "maxLength": 80 },
@@ -58,16 +49,7 @@
     },
     "events": {
       "type": "array",
-      "minItems": 1,
-      "items": {
-        "enum": [
-          "payment.created",
-          "payment.paid",
-          "payment.refunded",
-          "withdrawal.paid",
-          "med.opened"
-        ]
-      }
+      "items": { "$ref": "#/$defs/eventType" }
     },
     "scopes": {
       "type": "array",
@@ -85,55 +67,263 @@
         "type": "string",
         "minLength": 3,
         "maxLength": 253,
-        "pattern": "^[a-z0-9][a-z0-9.-]*\\.[a-z]{2,}$",
+        "pattern": "^[^/:A-Z]*\\.[^/:A-Z]*$",
         "description": "Bare lowercase fully-qualified host. No scheme, no port, no path."
       }
     },
     "actions": {
       "type": "array",
-      "minItems": 1,
       "maxItems": 20,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["on", "request"],
-        "properties": {
-          "on": {
-            "enum": [
-              "payment.created",
-              "payment.paid",
-              "payment.refunded",
-              "withdrawal.paid",
-              "med.opened"
-            ]
-          },
-          "requires": {
-            "type": "array",
-            "maxItems": 20,
-            "items": {
+      "items": { "$ref": "#/$defs/action" }
+    },
+    "flows": {
+      "type": "array",
+      "maxItems": 10,
+      "items": { "$ref": "#/$defs/flow" }
+    }
+  },
+  "if": { "required": ["manifestVersion"] },
+  "then": {
+    "properties": { "events": { "maxItems": 20 } },
+    "anyOf": [
+      { "required": ["actions"], "properties": { "actions": { "minItems": 1 } } },
+      { "required": ["flows"], "properties": { "flows": { "minItems": 1 } } }
+    ]
+  },
+  "else": {
+    "required": ["events", "actions"],
+    "not": { "required": ["flows"] },
+    "properties": {
+      "events": { "minItems": 1 },
+      "actions": { "minItems": 1 }
+    }
+  },
+  "$defs": {
+    "slug": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$"
+    },
+    "eventType": {
+      "enum": [
+        "payment.created",
+        "payment.paid",
+        "payment.refunded",
+        "withdrawal.paid",
+        "med.opened"
+      ]
+    },
+    "noPrototypeSegment": {
+      "not": { "pattern": "(^|\\.)(__proto__|constructor|prototype)(\\.|$)" }
+    },
+    "requiredPath": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 200,
+      "pattern": "^(event|config)(\\.[^.]+)*$",
+      "$ref": "#/$defs/noPrototypeSegment",
+      "description": "Dotted path that must be non-blank for the action to fire. Otherwise the delivery is recorded SKIPPED and nothing is sent."
+    },
+    "templatePath": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 200,
+      "pattern": "^(event|config|steps)(\\.[^.]+)*$",
+      "$ref": "#/$defs/noPrototypeSegment"
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "url"],
+      "properties": {
+        "method": { "enum": ["POST", "PUT", "PATCH"] },
+        "url": { "type": "string", "pattern": "^[Hh][Tt][Tt][Pp][Ss]://" },
+        "headers": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "body": {}
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["on", "request"],
+      "properties": {
+        "on": { "$ref": "#/$defs/eventType" },
+        "requires": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/requiredPath" }
+        },
+        "request": { "$ref": "#/$defs/request" }
+      }
+    },
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "trigger", "steps"],
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "trigger": { "$ref": "#/$defs/trigger" },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/step" }
+        }
+      }
+    },
+    "trigger": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "event"],
+          "properties": {
+            "type": { "const": "event" },
+            "event": { "$ref": "#/$defs/eventType" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "cron"],
+          "properties": {
+            "type": { "const": "schedule" },
+            "cron": { "type": "string", "minLength": 9, "maxLength": 120 },
+            "timezone": { "const": "America/Sao_Paulo" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "id"],
+          "properties": {
+            "type": { "const": "http" },
+            "id": { "$ref": "#/$defs/slug" }
+          }
+        }
+      ]
+    },
+    "stepId": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 48,
+      "pattern": "^[a-z0-9][a-z0-9_-]*[a-z0-9]$"
+    },
+    "step": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "request"],
+          "properties": {
+            "id": { "$ref": "#/$defs/stepId" },
+            "type": { "const": "request" },
+            "requires": {
+              "type": "array",
+              "maxItems": 20,
+              "items": { "$ref": "#/$defs/templatePath" }
+            },
+            "request": { "$ref": "#/$defs/request" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "when", "onFalse"],
+          "properties": {
+            "id": { "$ref": "#/$defs/stepId" },
+            "type": { "const": "condition" },
+            "when": { "$ref": "#/$defs/predicate" },
+            "onFalse": {
               "type": "string",
-              "minLength": 3,
-              "maxLength": 200,
-              "pattern": "^(event|config)\\.[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$",
-              "description": "Dotted event path that must be non-null for the action to fire. Otherwise the delivery is recorded SKIPPED and nothing is sent."
-            }
-          },
-          "request": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["method", "url"],
-            "properties": {
-              "method": { "enum": ["POST", "PUT", "PATCH"] },
-              "url": { "type": "string", "pattern": "^https://" },
-              "headers": {
-                "type": "object",
-                "additionalProperties": { "type": "string" }
-              },
-              "body": {}
+              "minLength": 2,
+              "maxLength": 48,
+              "description": "A later step id, or \"stop\"."
             }
           }
         }
-      }
+      ]
+    },
+    "predicateLiteral": {
+      "anyOf": [
+        { "type": "string", "maxLength": 500 },
+        { "type": ["number", "boolean", "null"] }
+      ]
+    },
+    "predicateOperand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["value"],
+          "properties": { "value": { "$ref": "#/$defs/predicateLiteral" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path"],
+          "properties": { "path": { "$ref": "#/$defs/templatePath" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["values"],
+          "properties": {
+            "values": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 50,
+              "items": { "$ref": "#/$defs/predicateLiteral" }
+            }
+          }
+        }
+      ]
+    },
+    "predicate": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["left", "op"],
+          "properties": {
+            "left": { "$ref": "#/$defs/templatePath" },
+            "op": {
+              "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "contains", "starts_with", "exists", "in"]
+            },
+            "right": { "$ref": "#/$defs/predicateOperand" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["all"],
+          "properties": {
+            "all": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 10,
+              "items": { "$ref": "#/$defs/predicate" }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["any"],
+          "properties": {
+            "any": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 10,
+              "items": { "$ref": "#/$defs/predicate" }
+            }
+          }
+        }
+      ]
     }
   }
 }
