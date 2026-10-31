@@ -1,7 +1,7 @@
 {
   "id": "meta-capi",
   "name": "Meta Conversions API",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "developer": "YuvexPay",
   "description": "Envia conversoes server-side para o Meta (Facebook e Instagram) via Conversions API, com e-mail e telefone hasheados em SHA-256.",
   "icon": "https://cdn.yuvexpay.com/meta-capi.png",
@@ -35,7 +35,7 @@
       "on": "payment.paid",
       "request": {
         "method": "POST",
-        "url": "https://graph.facebook.com/v21.0/{{ config.pixelId }}/events?access_token={{ config.accessToken }}",
+        "url": "https://graph.facebook.com/v26.0/{{ config.pixelId }}/events?access_token={{ config.accessToken }}",
         "headers": {},
         "body": {
           "test_event_code": "{{ config.testEventCode }}",
@@ -47,10 +47,12 @@
               "action_source": "website",
               "user_data": {
                 "em": "{{ event.customer.contact.email | trim | lower | sha256 }}",
-                "ph": "{{ event.customer.contact.phone | digits_only | sha256 }}",
+                "ph": "{{ event.customer.contact.phoneE164 | digits_only | sha256 }}",
                 "external_id": "{{ event.customer.document.value | digits_only | sha256 }}",
                 "client_ip_address": "{{ event.tracking.clientIp }}",
-                "client_user_agent": "{{ event.tracking.userAgent }}"
+                "client_user_agent": "{{ event.tracking.userAgent }}",
+                "fbc": "{{ event.tracking.fbc }}",
+                "fbp": "{{ event.tracking.fbp }}"
               },
               "custom_data": {
                 "currency": "{{ event.data.payment.currency }}",

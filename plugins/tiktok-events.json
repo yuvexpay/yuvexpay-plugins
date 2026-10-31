@@ -1,0 +1,80 @@
+{
+  "id": "tiktok-events",
+  "name": "TikTok Events API",
+  "version": "1.0.0",
+  "developer": "YuvexPay",
+  "description": "Envia compras pagas para o TikTok via Events API, com o ttclid do anuncio e o e-mail hasheado em SHA-256.",
+  "icon": "https://cdn.yuvexpay.com/tiktok-events.png",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "pixelCode": {
+        "type": "string",
+        "title": "Pixel Code",
+        "description": "Codigo do seu pixel do TikTok, exibido no Gerenciador de Eventos."
+      },
+      "accessToken": {
+        "type": "string",
+        "title": "Access Token",
+        "description": "Token de acesso da Events API, gerado nas configuracoes do pixel.",
+        "secret": true
+      },
+      "testEventCode": {
+        "type": "string",
+        "title": "Test Event Code",
+        "description": "Opcional. Preencha com o codigo da aba Eventos de teste do Gerenciador de Eventos para validar a integracao. Remova antes de operar em producao."
+      }
+    },
+    "required": ["pixelCode", "accessToken"]
+  },
+  "events": ["payment.paid"],
+  "scopes": ["data", "tracking", "customer.contact"],
+  "egress": ["business-api.tiktok.com"],
+  "actions": [
+    {
+      "on": "payment.paid",
+      "request": {
+        "method": "POST",
+        "url": "https://business-api.tiktok.com/open_api/v1.3/event/track/",
+        "headers": { "Access-Token": "{{ config.accessToken }}" },
+        "body": {
+          "event_source": "web",
+          "event_source_id": "{{ config.pixelCode }}",
+          "test_event_code": "{{ config.testEventCode }}",
+          "data": [
+            {
+              "event": "Purchase",
+              "event_time": "{{ event.data.payment.paidAt | unix_seconds }}",
+              "event_id": "{{ event.data.payment.id }}",
+              "user": {
+                "ttclid": "{{ event.tracking.ttclid }}",
+                "email": "{{ event.customer.contact.email | trim | lower | sha256 }}",
+                "phone": "{{ event.customer.contact.phoneE164 | sha256 }}",
+                "external_id": "{{ event.customer.id | sha256 }}",
+                "ip": "{{ event.tracking.clientIp }}",
+                "user_agent": "{{ event.tracking.userAgent }}"
+              },
+              "page": {
+                "url": "https://checkout.yuvexpay.com/checkout/{{ event.data.payment.id }}"
+              },
+              "properties": {
+                "currency": "{{ event.data.payment.currency }}",
+                "value": "{{ event.data.payment.amountCents | cents_to_decimal }}",
+                "content_type": "product",
+                "contents": [
+                  {
+                    "content_id": "{{ event.data.payment.id }}",
+                    "content_name": "{{ event.data.payment.description | fallback:Pagamento YuvexPay }}",
+                    "price": "{{ event.data.payment.amountCents | cents_to_decimal }}",
+                    "quantity": 1
+                  }
+                ],
+                "order_id": "{{ event.data.payment.id }}"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
