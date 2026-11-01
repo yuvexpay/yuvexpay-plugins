@@ -27,7 +27,6 @@ export const SCOPES = ["data", "tracking", "customer.contact", "customer.documen
 
 export const MANIFEST_VERSION_V2 = 2;
 
-// Backend defaults of PLUGIN_MAX_EGRESS_HOSTS, PLUGIN_MAX_STEPS_PER_PLUGIN and PLUGIN_MIN_SCHEDULE_INTERVAL_MINUTES.
 export const MAX_EGRESS_HOSTS_V2 = 2;
 export const MAX_STEPS_PER_FLOW = 12;
 export const MIN_SCHEDULE_INTERVAL_MINUTES = 60;
