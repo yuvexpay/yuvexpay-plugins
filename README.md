@@ -7,12 +7,10 @@ A plugin is a single declarative JSON file. It maps a YuvexPay event onto an out
 ## How a manifest reaches production
 
 1. You open a pull request.
-2. CI validates the JSON Schema and the security rules.
-3. A maintainer approves (CODEOWNERS; manifest changes require security review).
-4. GitHub auto-merge merges once checks are green and the approval is in.
-5. A post-merge workflow publishes every manifest on `main` to production.
+2. A maintainer reviews it (CODEOWNERS; manifest changes require security review), runs `npm run validate:schema`, `npm run validate` and `npm test` locally, and merges.
+3. The push to `main` validates the JSON Schema and the security rules again and publishes every manifest on `main` to production.
 
-The backend **re-validates every manifest server-side** before storing it — schema, egress allowlist and SSRF rules are enforced again there. Repo CI is a fast signal, not the security boundary.
+The backend **re-validates every manifest server-side** before storing it — schema, egress allowlist and SSRF rules are enforced again there. The repo checks are a fast signal, not the security boundary.
 
 This repository is the single source of truth. A manifest deleted here is disabled in production on the next publish; it is never hard-deleted, so existing installs stop receiving events without erroring.
 
@@ -24,7 +22,7 @@ Plugins only receive live-mode events. Sandbox never dispatches.
 
 1. Fork this repository.
 2. Add `plugins/<your-plugin-id>.json`. The filename must match the manifest `id`.
-3. Open a pull request. CI validates the schema and the security rules.
+3. Run `npm run validate:schema` and `npm run validate`, then open a pull request. No CI runs on pull requests.
 4. A YuvexPay maintainer reviews and merges.
 
 ## Manifest
